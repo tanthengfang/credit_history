@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList, AreaChart, Area, Legend } from "recharts";
 
 const EARN_SOURCES = {
   email: { label: "绑定邮箱", icon: "✉" },
@@ -13,27 +13,35 @@ const SPEND_SOURCES = {
 };
 const ALL_SOURCES = { ...EARN_SOURCES, ...SPEND_SOURCES };
 
-const VIP_PLANS  = [
-  { days:1,  pts:30,  color:"#FAC775", bg:"#FEF4E2", text:"#633806" },
-  { days:3,  pts:70,  color:"#EF9F27", bg:"#FAEEDA", text:"#633806" },
-  { days:7,  pts:150, color:"#BA7517", bg:"#F5E2C0", text:"#412402" },
-  { days:30, pts:500, color:"#854F0B", bg:"#EDD7B0", text:"#412402" },
+const VIP_PLANS = [
+  { days:3,   label:"3天",   pts:50,   color:"#F97316", bg:"#FEF0E6", text:"#7C2D00" },
+  { days:7,   label:"7天",   pts:100,  color:"#F97316", bg:"#FEF0E6", text:"#7C2D00" },
+  { days:30,  label:"30天",  pts:350,  color:"#F97316", bg:"#FEF0E6", text:"#7C2D00" },
+  { days:90,  label:"90天",  pts:900,  color:"#F97316", bg:"#FEF0E6", text:"#7C2D00" },
+  { days:180, label:"180天", pts:1600, color:"#F97316", bg:"#FEF0E6", text:"#7C2D00" },
+  { days:365, label:"1年",   pts:2800, color:"#F97316", bg:"#FEF0E6", text:"#7C2D00" },
+  { days:730, label:"2年",   pts:5000, color:"#F97316", bg:"#FEF0E6", text:"#7C2D00" },
 ];
 const SVIP_PLANS = [
-  { days:1,  pts:60,  color:"#9FE1CB", bg:"#E8FAF4", text:"#085041" },
-  { days:3,  pts:150, color:"#5DCAA5", bg:"#CBEFE2", text:"#085041" },
-  { days:7,  pts:300, color:"#1D9E75", bg:"#B0E5D0", text:"#04342C" },
-  { days:30, pts:900, color:"#0F6E56", bg:"#9FE1CB", text:"#04342C" },
+  { days:3,   label:"3天",   pts:100,  color:"#8B5CF6", bg:"#F3EFFD", text:"#3B0764" },
+  { days:7,   label:"7天",   pts:200,  color:"#8B5CF6", bg:"#F3EFFD", text:"#3B0764" },
+  { days:30,  label:"30天",  pts:600,  color:"#8B5CF6", bg:"#F3EFFD", text:"#3B0764" },
+  { days:90,  label:"90天",  pts:1600, color:"#8B5CF6", bg:"#F3EFFD", text:"#3B0764" },
+  { days:180, label:"180天", pts:2800, color:"#8B5CF6", bg:"#F3EFFD", text:"#3B0764" },
+  { days:365, label:"1年",   pts:5000, color:"#8B5CF6", bg:"#F3EFFD", text:"#3B0764" },
+  { days:730, label:"2年",   pts:9000, color:"#8B5CF6", bg:"#F3EFFD", text:"#3B0764" },
 ];
 
 function rnd(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
 const NAMES = ["wx_user88","refer_king","task001","alg123456","ik254","qq258","wsxnko","986571","2378rygfae","gfa_vip","moon99","sky_top","netfan","promax1","daily01","aloha22","bright5","coolx7","doge_m","elitevpn"];
 const TASK_LABELS = [
-  "完成关注 X 平台账号任务",
-  "完成留言 @吴老师 帖子任务",
-  "完成关注小红书平台账号任务",
-  "完成留言 @李老师 帖子任务",
-  "完成关注 INS 平台账号任务",
+  { label:"完成关注 X 平台账号任务",      pts: 80  },
+  { label:"完成留言 @吴老师 帖子任务",    pts: 120 },
+  { label:"完成关注小红书平台账号任务",    pts: 80  },
+  { label:"完成留言 @李老师 帖子任务",    pts: 120 },
+  { label:"完成关注 INS 平台账号任务",    pts: 80  },
+  { label:"完成每日签到任务",            pts: 20  },
+  { label:"完成分享至朋友圈任务",         pts: 50  },
 ];
 
 function pickWeighted(plans, weights) {
@@ -43,52 +51,72 @@ function pickWeighted(plans, weights) {
   return plans[0];
 }
 
+const EARN_PTS = { email: 200, refer: 500 }; // fixed per source
 const TRANSACTIONS = Array.from({ length:200 }, (_, i) => {
-  const isEarn = Math.random() > 0.42;
+  const isEarn = Math.random() > 0.35; // 65% earn
   let src, pts, plan = null;
   let taskLabel = null;
   if (isEarn) {
-    src = ["email","refer","task"][rnd(0,2)];
-    pts = [30,50,70,100][rnd(0,3)];
-    if (src === "task") taskLabel = TASK_LABELS[rnd(0, TASK_LABELS.length - 1)];
+    src = ["email","refer","task"][rnd(0,2)]; // weighted manually below via isEarn ratio
+    if (src === "task") {
+      const t = TASK_LABELS[rnd(0, TASK_LABELS.length - 1)];
+      taskLabel = t.label;
+      pts = t.pts;
+    } else {
+      pts = EARN_PTS[src];
+    }
   } else {
     src = ["vip","svip","img"][rnd(0,2)];
-    if (src==="vip")       { plan = pickWeighted(VIP_PLANS,  [40,25,15,20]); pts = plan.pts; }
-    else if (src==="svip") { plan = pickWeighted(SVIP_PLANS, [30,25,20,25]); pts = plan.pts; }
-    else pts = [10,20,50][rnd(0,2)];
+    if (src==="vip")       { plan = pickWeighted(VIP_PLANS,  [35,25,20,10,5,3,2]); pts = plan.pts; }
+    else if (src==="svip") { plan = pickWeighted(SVIP_PLANS, [30,22,20,12,8,5,3]); pts = plan.pts; }
+    else pts = [5, 10, 20][rnd(0,2)];
   }
   const base = new Date("2026-05-11T10:45:00");
-  const ts   = new Date(base.getTime() - i * rnd(2,15) * 60000);
-  return { id:i+1, user:NAMES[rnd(0,NAMES.length-1)], src, pts, plan, taskLabel, type:isEarn?"earn":"spend", ts, balance:rnd(60,3000) };
+  const ts   = new Date(base.getTime() - i * rnd(8,16) * 3600000);
+  return { id:i+1, user:NAMES[rnd(0,NAMES.length-1)], src, pts, plan, taskLabel, type:isEarn?"earn":"spend", ts, balance:rnd(1200,9800) };
 });
 
 const EARN_PIE = [
-  { name:"绑定邮箱", value:34, color:"#1D9E75" },
-  { name:"邀请好友", value:41, color:"#5DCAA5" },
-  { name:"任务系统", value:25, color:"#9FE1CB" },
+  { name:"绑定邮箱", value:20, color:"#1D9E75" },
+  { name:"邀请好友", value:45, color:"#5DCAA5" },
+  { name:"任务系统", value:35, color:"#9FE1CB" },
 ];
+const TASK_COLORS = ["#FAC775","#EF9F27","#5DCAA5","#1D9E75","#9FE1CB","#854F0B","#0F6E56","#BA7517"];
 
+const SPEND_DURATIONS = [
+  { days:3, label:"3天" }, { days:7, label:"7天" }, { days:30, label:"30天" },
+  { days:90, label:"90天" }, { days:180, label:"180天" }, { days:365, label:"1年" }, { days:730, label:"2年" },
+];
 function buildSpendBar() {
-  const tally = { vip:{1:0,3:0,7:0,30:0}, svip:{1:0,3:0,7:0,30:0}, img:0 };
+  const tally = {};
+  SPEND_DURATIONS.forEach(d => { tally[d.days] = { vip:0, svip:0 }; });
+  let imgCount = 0;
   TRANSACTIONS.forEach(r => {
     if (r.type!=="spend") return;
-    if ((r.src==="vip"||r.src==="svip") && r.plan) tally[r.src][r.plan.days]++;
-    else if (r.src==="img") tally.img++;
+    if ((r.src==="vip"||r.src==="svip") && r.plan && tally[r.plan.days]) tally[r.plan.days][r.src]++;
+    else if (r.src==="img") imgCount++;
   });
   return [
-    { name:"VIP 1天",  count:tally.vip[1],   color:"#FAC775", src:"vip",  days:1  },
-    { name:"VIP 3天",  count:tally.vip[3],   color:"#EF9F27", src:"vip",  days:3  },
-    { name:"VIP 7天",  count:tally.vip[7],   color:"#BA7517", src:"vip",  days:7  },
-    { name:"VIP 30天", count:tally.vip[30],  color:"#854F0B", src:"vip",  days:30 },
-    { name:"SVIP 1天", count:tally.svip[1],  color:"#9FE1CB", src:"svip", days:1  },
-    { name:"SVIP 3天", count:tally.svip[3],  color:"#5DCAA5", src:"svip", days:3  },
-    { name:"SVIP 7天", count:tally.svip[7],  color:"#1D9E75", src:"svip", days:7  },
-    { name:"SVIP 30天",count:tally.svip[30], color:"#0F6E56", src:"svip", days:30 },
-    { name:"图片生成",  count:tally.img,      color:"#ccbfa0", src:"img",  days:null },
+    ...SPEND_DURATIONS.map(d => ({ name: d.label, vip: tally[d.days].vip, svip: tally[d.days].svip })),
+    { name: "图片生成", img: imgCount },
   ];
 }
 const SPEND_BAR = buildSpendBar();
-const SPEND_TOTAL = SPEND_BAR.reduce((s, d) => s + d.count, 0);
+
+function buildTimeSeries(granularity) {
+  const buckets = {};
+  TRANSACTIONS.forEach(r => {
+    const d = r.ts;
+    let key;
+    if (granularity === "day")   key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    else if (granularity === "month") key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+    else key = `${d.getFullYear()}-Q${Math.floor(d.getMonth()/3)+1}`;
+    if (!buckets[key]) buckets[key] = { date: key, earn: 0, spend: 0 };
+    if (r.type === "earn") buckets[key].earn += r.pts;
+    else buckets[key].spend += r.pts;
+  });
+  return Object.values(buckets).sort((a, b) => a.date.localeCompare(b.date));
+}
 
 function DonutChart({ data, center }) {
   const [active, setActive] = useState(null);
@@ -111,17 +139,6 @@ function DonutChart({ data, center }) {
   );
 }
 
-function BarTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  const d = SPEND_BAR.find(b => b.name===label);
-  return (
-    <div style={{ background:"#fff",border:"0.5px solid #e0e0e0",borderRadius:8,padding:"8px 12px",fontSize:13,boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-      <div style={{ fontWeight:500,marginBottom:4,color:"#111" }}>{label}</div>
-      <div style={{ color:"#888" }}>兑换次数：<b style={{ color:"#111" }}>{payload[0].value}</b></div>
-      {d?.days && <div style={{ color:"#888",marginTop:2 }}>套餐时长：<b style={{ color:"#111" }}>{d.days} 天</b></div>}
-    </div>
-  );
-}
 
 const PER = 10;
 function fmt(d) {
@@ -137,11 +154,16 @@ export default function CreditHistory() {
   const [planFilter, setPlanFilter] = useState("all");
   const [search,     setSearch]     = useState("");
   const [page,       setPage]       = useState(1);
+  const [openMenu,        setOpenMenu]        = useState(null);
+  const [timeGranularity, setTimeGranularity] = useState("day");
+
+  const MENU_ITEMS = ["用户详情","标签详情","修改用户套餐","修改邮箱","用户密码重置","注销申请","修改积分额度","推荐用户列表","打开工单","封禁用户","提升用户为代理","修改设备注册限制"];
+  const timeSeriesData = useMemo(() => buildTimeSeries(timeGranularity), [timeGranularity]);
 
   const planOptions = useMemo(() => {
     if (srcFilter==="vip")  return VIP_PLANS.map(p=>({ v:String(p.days), l:`${p.days}天` }));
     if (srcFilter==="svip") return SVIP_PLANS.map(p=>({ v:String(p.days), l:`${p.days}天` }));
-    if (srcFilter==="task") return [...new Set(TASK_LABELS)].map(t=>({ v:t, l:t }));
+    if (srcFilter==="task") return TASK_LABELS.map(t=>({ v:t.label, l:t.label }));
     return [];
   }, [srcFilter]);
 
@@ -165,6 +187,24 @@ export default function CreditHistory() {
   const spentPts  = useMemo(() => filtered.filter(r=>r.type==="spend").reduce((s,r)=>s+r.pts,0), [filtered]);
   const isFiltered = srcFilter!=="all" || planFilter!=="all" || tab!=="all" || search!=="";
 
+  const earnPieData = useMemo(() => {
+    if (srcFilter !== "task") return EARN_PIE;
+    const taskTxns = TRANSACTIONS.filter(r => r.src === "task" && r.taskLabel);
+    const total = taskTxns.length;
+    if (total === 0) return EARN_PIE;
+    const counts = {};
+    taskTxns.forEach(r => { counts[r.taskLabel] = (counts[r.taskLabel] || 0) + 1; });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const raw = sorted.map(([name, count]) => ({ name, raw: count / total * 100 }));
+    const floors = raw.map(e => Math.floor(e.raw));
+    const diff = 100 - floors.reduce((a, b) => a + b, 0);
+    raw.map((e, i) => ({ i, frac: e.raw - Math.floor(e.raw) }))
+       .sort((a, b) => b.frac - a.frac)
+       .slice(0, diff)
+       .forEach(({ i }) => floors[i]++);
+    return raw.map((e, i) => ({ name: e.name, value: floors[i], color: TASK_COLORS[i % TASK_COLORS.length] }));
+  }, [srcFilter]);
+
   function changeTab(t)  { setTab(t);        setPage(1); }
   function changeSrc(s)  { setSrcFilter(s);  setPlanFilter("all"); setPage(1); }
   function changePlan(p) { setPlanFilter(p); setPage(1); }
@@ -172,12 +212,12 @@ export default function CreditHistory() {
   function goPage(p)     { setPage(Math.max(1,Math.min(p,totalPages))); }
 
   return (
-    <div style={{ fontFamily:"system-ui,-apple-system,sans-serif",fontSize:14,color:"#1a1a1a",background:"#f5f5f0",minHeight:"100vh",paddingBottom:"2rem" }}>
+    <div onClick={()=>setOpenMenu(null)} style={{ fontFamily:"system-ui,-apple-system,sans-serif",fontSize:14,color:"#1a1a1a",background:"#f5f5f0",minHeight:"100vh",paddingBottom:"2rem" }}>
 
       {/* Header */}
       <div style={{ textAlign:"center",padding:"28px 24px 20px" }}>
         <h1 style={{ fontSize:28,fontWeight:600,margin:0,color:"#111" }}>积分记录</h1>
-        <p style={{ fontSize:13,color:"#888",marginTop:6 }}>追踪积分的获取与消耗，分析来源与使用分布</p>
+        <p style={{ fontSize:13,color:"#888",marginTop:6 }}>追踪积分的发行与消耗，分析来源与使用分布</p>
       </div>
 
       <div style={{ maxWidth:1440,margin:"0 auto",padding:"0 32px" }}>
@@ -187,7 +227,7 @@ export default function CreditHistory() {
           <button style={btn}>📅 2026-05-01 — 2026-05-11</button>
           <select value={srcFilter} onChange={e=>changeSrc(e.target.value)} style={sel}>
             <option value="all">全部来源</option>
-            <optgroup label="获取">
+            <optgroup label="发行">
               <option value="email">绑定邮箱</option>
               <option value="refer">邀请好友</option>
               <option value="task">任务系统</option>
@@ -205,86 +245,174 @@ export default function CreditHistory() {
             </select>
           )}
           <div style={{ flex:1 }}/>
-          <button style={btn}>⬇ 导出 CSV</button>
         </div>
 
         {/* Metrics */}
-        <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16 }}>
-          {[
-            { label:"总获取积分",    value: isFiltered ? earnedPts.toLocaleString() : "1,284,600", sub: isFiltered ? `筛选结果共 ${filtered.filter(r=>r.type==="earn").length} 笔` : "↑ 12.4% 较上期", color:"#0F6E56", icon:"＋" },
-            { label:"总消耗积分",    value: isFiltered ? spentPts.toLocaleString()  : "987,450",   sub: isFiltered ? `筛选结果共 ${filtered.filter(r=>r.type==="spend").length} 笔` : "↑ 8.1% 较上期",  color:"#993C1D", icon:"－" },
-            { label:"净积分流通",    value: isFiltered ? (earnedPts - spentPts).toLocaleString()  : "297,150",   sub:"库存积分余量",      color:"#185FA5", icon:"≈"  },
-            { label:"有积分活跃用户",value:"38,241",    sub:"平均余额 156 pts", color:"#854F0B", icon:"◉"  },
-          ].map((m,i)=>(
-            <div key={i} style={{ background:"#fff",borderRadius:10,border:"0.5px solid #e8e8e0",padding:"14px 16px" }}>
-              <div style={{ fontSize:12,color:"#999",marginBottom:6,display:"flex",alignItems:"center",gap:5 }}>
-                <span style={{ color:m.color,fontWeight:700 }}>{m.icon}</span>{m.label}
-              </div>
-              <div style={{ fontSize:22,fontWeight:600,color:m.color }}>{m.value}</div>
-              <div style={{ fontSize:12,color:"#aaa",marginTop:3 }}>{m.sub}</div>
+        {(() => {
+          const allEarned = TRANSACTIONS.filter(r=>r.type==="earn").reduce((s,r)=>s+r.pts,0);
+          const allSpent  = TRANSACTIONS.filter(r=>r.type==="spend").reduce((s,r)=>s+r.pts,0);
+          const netChange = allEarned - allSpent;
+          const ratio     = allEarned > 0 ? (allSpent / allEarned).toFixed(2) : "0.00";
+          const totalStock = 8650000;
+          const PLATFORM_ACTIVE_USERS = 38241;
+          const spendUsers = new Set(TRANSACTIONS.filter(r=>r.type==="spend").map(r=>r.user)).size;
+          const scaledSpendUsers = Math.round(spendUsers / 20 * PLATFORM_ACTIVE_USERS * 0.62);
+          const penetration = Math.min(Math.round(scaledSpendUsers / PLATFORM_ACTIVE_USERS * 100), 85);
+          const fmtK = n => n >= 1000000 ? `${(n/1000000).toFixed(2)}M` : n >= 1000 ? `${(n/1000).toFixed(0)}K` : n;
+          const cards = [
+            {
+              label: "本月净增量",
+              value: `${netChange>=0?"+":""}${fmtK(netChange)}`,
+              sub: `发行 ${fmtK(allEarned)} － 消耗 ${fmtK(allSpent)}`,
+              valueColor: netChange >= 0 ? "#0F6E56" : "#993C1D",
+            },
+            {
+              label: "消耗 / 发行比",
+              value: ratio,
+              ratioHealthy: parseFloat(ratio) >= 0.7 && parseFloat(ratio) <= 0.95,
+              sub: parseFloat(ratio) < 1 ? "↓ 发多于花，余额累积" : "↑ 消耗超过发行",
+              valueColor: parseFloat(ratio) >= 0.7 && parseFloat(ratio) <= 0.95 ? "#0F6E56" : "#993C1D",
+            },
+            {
+              label: "未消耗总存量",
+              value: fmtK(totalStock),
+              sub: `折算负债 ≈ ¥${(totalStock * 0.01 / 10000).toFixed(1)}万`,
+              valueColor: "#854F0B",
+            },
+            {
+              label: "消耗渗透率",
+              value: `${penetration}%`,
+              sub: `有余额但花过的用户（共 ${PLATFORM_ACTIVE_USERS.toLocaleString()} 人）`,
+              valueColor: "#6D28D9",
+            },
+            {
+              label: "有积分活跃用户",
+              value: "38,241",
+              sub: "平均余额 156 pts",
+              valueColor: "#854F0B",
+            },
+          ];
+          return (
+            <div style={{ display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:16 }}>
+              {cards.map((m,i)=>(
+                <div key={i} style={{ background:"#fff",borderRadius:10,border:"0.5px solid #e8e8e0",padding:"14px 16px" }}>
+                  <div style={{ fontSize:12,color:"#999",marginBottom:8 }}>{m.label}</div>
+                  <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                    <span style={{ fontSize:22,fontWeight:700,color:m.valueColor,letterSpacing:"-0.5px" }}>{m.value}</span>
+                    {"ratioHealthy" in m && (
+                      <span style={{ fontSize:11,padding:"2px 7px",borderRadius:4,
+                        background: m.ratioHealthy ? "#E1F5EE" : "#FAECE7",
+                        color: m.ratioHealthy ? "#0F6E56" : "#993C1D" }}>
+                        健康区间 0.7 ~ 0.95
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize:12,color:"#aaa",marginTop:4 }}>{m.sub}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })()}
 
         {/* Charts */}
         <div style={{ display:"grid",gridTemplateColumns:"1fr 2fr",gap:12,marginBottom:16 }}>
 
-          {/* Earn donut */}
-          <div style={{ background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:12,padding:"16px 20px" }}>
-            <div style={{ fontWeight:500,fontSize:14,marginBottom:2 }}>积分获取来源</div>
-            <div style={{ fontSize:12,color:"#999",marginBottom:10 }}>各渠道累计发放量</div>
-            <div style={{ display:"flex",flexDirection:"column",gap:5,marginBottom:10 }}>
-              {EARN_PIE.map((d,i)=>(
-                <span key={i} style={{ display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#666" }}>
-                  <span style={{ width:10,height:10,borderRadius:2,background:d.color,flexShrink:0 }}/>
-                  <span style={{ flex:1 }}>{d.name}</span>
-                  <span style={{ fontWeight:500,color:"#333" }}>{d.value}%</span>
-                </span>
-              ))}
+          {/* Earn donut / task breakdown */}
+          <div style={{ background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:12,padding:"16px 20px",height:310,display:"flex",flexDirection:"column" }}>
+            <div style={{ fontWeight:500,fontSize:14,marginBottom:2 }}>积分发行来源</div>
+            <div style={{ fontSize:12,color:"#999",marginBottom:14 }}>
+              {srcFilter==="task" ? "任务系统各类型占比" : "各渠道累计发放量"}
             </div>
-            <DonutChart data={EARN_PIE} center="获取" />
+            {srcFilter==="task" ? (
+              <div className="hide-scrollbar" style={{ display:"flex",flexDirection:"column",gap:10,overflowY:"auto",flex:1 }}>
+                {earnPieData.map((d,i)=>(
+                  <div key={i}>
+                    <div style={{ display:"flex",justifyContent:"space-between",fontSize:12,color:"#555",marginBottom:4 }}>
+                      <span>{d.name}</span>
+                      <span style={{ fontWeight:500,color:"#333" }}>{d.value}%</span>
+                    </div>
+                    <div style={{ height:6,borderRadius:3,background:"#f0f0ec" }}>
+                      <div style={{ height:"100%",borderRadius:3,background:d.color,width:`${d.value}%`,transition:"width 0.3s" }}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div style={{ display:"flex",flexDirection:"column",gap:5,marginBottom:10 }}>
+                  {earnPieData.map((d,i)=>(
+                    <span key={i} style={{ display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#666" }}>
+                      <span style={{ width:10,height:10,borderRadius:2,background:d.color,flexShrink:0 }}/>
+                      <span style={{ flex:1 }}>{d.name}</span>
+                      <span style={{ fontWeight:500,color:"#333" }}>{d.value}%</span>
+                    </span>
+                  ))}
+                </div>
+                <DonutChart data={earnPieData} center="发行" />
+              </>
+            )}
           </div>
 
           {/* Spend bar */}
-          <div style={{ background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:12,padding:"16px 20px" }}>
+          <div style={{ background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:12,padding:"16px 20px",height:310,display:"flex",flexDirection:"column" }}>
             <div style={{ fontWeight:500,fontSize:14,marginBottom:2 }}>积分消耗细分</div>
-            <div style={{ fontSize:12,color:"#999",marginBottom:12 }}>VIP / SVIP 按套餐时长拆分</div>
-
-            {/* Legend */}
-            <div style={{ display:"flex",gap:24,marginBottom:12,flexWrap:"wrap" }}>
-              {[
-                { label:"VIP", items:[{c:"#FAC775",l:"1天"},{c:"#EF9F27",l:"3天"},{c:"#BA7517",l:"7天"},{c:"#854F0B",l:"30天"}] },
-                { label:"SVIP",items:[{c:"#9FE1CB",l:"1天"},{c:"#5DCAA5",l:"3天"},{c:"#1D9E75",l:"7天"},{c:"#0F6E56",l:"30天"}] },
-                { label:"其他",items:[{c:"#ccbfa0",l:"图片生成"}] },
-              ].map((g,gi)=>(
-                <div key={gi}>
-                  <div style={{ fontSize:11,color:"#bbb",marginBottom:4 }}>{g.label}</div>
-                  <div style={{ display:"flex",gap:8 }}>
-                    {g.items.map((d,di)=>(
-                      <span key={di} style={{ display:"flex",alignItems:"center",gap:3,fontSize:12,color:"#777" }}>
-                        <span style={{ width:10,height:10,borderRadius:2,background:d.c,display:"inline-block" }}/>{d.l}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={SPEND_BAR} margin={{ top:20,right:0,left:-20,bottom:0 }} barSize={20}>
+            <div style={{ fontSize:12,color:"#999",marginBottom:12 }}>VIP / SVIP 按套餐时长销售量</div>
+            <ResponsiveContainer width="100%" style={{ flex:1 }}>
+              <BarChart data={SPEND_BAR} margin={{ top:8,right:8,left:-20,bottom:0 }} barSize={18} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0ec"/>
-                <XAxis dataKey="name" tick={{ fontSize:11,fill:"#bbb" }} axisLine={false} tickLine={false}/>
+                <XAxis dataKey="name" tick={{ fontSize:12,fill:"#bbb" }} axisLine={false} tickLine={false}/>
                 <YAxis tick={{ fontSize:11,fill:"#ccc" }} axisLine={false} tickLine={false}/>
-                <Tooltip content={<BarTooltip/>} cursor={{ fill:"#f8f8f4" }}/>
-                <Bar dataKey="count" radius={[4,4,0,0]}>
-                  {SPEND_BAR.map((d,i)=><Cell key={i} fill={d.color}/>)}
-                  <LabelList dataKey="count" position="top"
-                    formatter={v => SPEND_TOTAL > 0 ? `${Math.round(v/SPEND_TOTAL*100)}%` : ""}
-                    style={{ fontSize:10, fill:"#aaa" }}/>
-                </Bar>
+                <Tooltip cursor={{ fill:"#f8f8f4" }} contentStyle={{ fontSize:13,borderRadius:8,border:"0.5px solid #e0e0e0" }}
+                  formatter={(v,n)=>[v, n==="vip"?"VIP 销售量":n==="svip"?"SVIP 销售量":"图片生成"]}/>
+                <Legend formatter={v=>v==="vip"?"VIP 销售量":v==="svip"?"SVIP 销售量":"图片生成"}
+                  wrapperStyle={{ fontSize:12,paddingTop:8 }} iconType="circle" iconSize={8}/>
+                <Bar dataKey="vip"  fill="#F97316" radius={[4,4,0,0]}/>
+                <Bar dataKey="svip" fill="#8B5CF6" radius={[4,4,0,0]}/>
+                <Bar dataKey="img"  fill="#ccbfa0" radius={[4,4,0,0]}/>
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+
+        {/* Time series */}
+        <div style={{ background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:12,padding:"16px 20px",marginBottom:16 }}>
+          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
+            <div>
+              <div style={{ fontWeight:500,fontSize:14 }}>积分流动趋势</div>
+              <div style={{ fontSize:12,color:"#999",marginTop:2 }}>发行与消耗积分随时间的变化</div>
+            </div>
+            <div style={{ display:"flex",gap:2,background:"#f0ede8",padding:3,borderRadius:8 }}>
+              {[["day","按天"],["month","按月"],["quarter","按季度"]].map(([v,l])=>(
+                <button key={v} onClick={()=>setTimeGranularity(v)}
+                  style={{ height:28,padding:"0 14px",fontSize:12,border:timeGranularity===v?"0.5px solid #e0e0e0":"none",
+                    borderRadius:6,cursor:"pointer",background:timeGranularity===v?"#fff":"transparent",
+                    color:timeGranularity===v?"#111":"#888",fontWeight:timeGranularity===v?500:400 }}>{l}</button>
+              ))}
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={timeSeriesData} margin={{ top:4,right:4,left:-16,bottom:0 }}>
+              <defs>
+                <linearGradient id="gEarn" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#1D9E75" stopOpacity={0.15}/>
+                  <stop offset="95%" stopColor="#1D9E75" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="gSpend" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#993C1D" stopOpacity={0.12}/>
+                  <stop offset="95%" stopColor="#993C1D" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0ec"/>
+              <XAxis dataKey="date" tick={{ fontSize:11,fill:"#bbb" }} axisLine={false} tickLine={false}
+                interval={timeGranularity==="day" ? Math.floor(timeSeriesData.length/8) : 0}/>
+              <YAxis tick={{ fontSize:11,fill:"#ccc" }} axisLine={false} tickLine={false}/>
+              <Tooltip contentStyle={{ fontSize:13,borderRadius:8,border:"0.5px solid #e0e0e0" }}
+                formatter={(v,n)=>[v.toLocaleString(), n==="earn"?"发行积分":"消耗积分"]}/>
+              <Legend formatter={v=>v==="earn"?"发行积分":"消耗积分"} wrapperStyle={{ fontSize:12,color:"#888" }}/>
+              <Area type="monotone" dataKey="earn"  stroke="#1D9E75" strokeWidth={1.5} fill="url(#gEarn)"  dot={false}/>
+              <Area type="monotone" dataKey="spend" stroke="#993C1D" strokeWidth={1.5} fill="url(#gSpend)" dot={false}/>
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
 
         {/* Table */}
@@ -292,7 +420,7 @@ export default function CreditHistory() {
 
           <div style={{ padding:"12px 16px",display:"flex",alignItems:"center",gap:10,borderBottom:"0.5px solid #eee",flexWrap:"wrap" }}>
             <div style={{ display:"flex",gap:2,background:"#f0ede8",padding:3,borderRadius:8 }}>
-              {[["all","全部"],["earn","获取"],["spend","消耗"]].map(([t,l])=>(
+              {[["all","全部"],["earn","发行"],["spend","消耗"]].map(([t,l])=>(
                 <button key={t} onClick={()=>changeTab(t)}
                   style={{ height:28,padding:"0 14px",fontSize:12,border:tab===t?"0.5px solid #e0e0e0":"none",
                     borderRadius:6,cursor:"pointer",background:tab===t?"#fff":"transparent",
@@ -311,14 +439,14 @@ export default function CreditHistory() {
 
           <table style={{ width:"100%",borderCollapse:"collapse",tableLayout:"fixed" }}>
             <colgroup>
-              <col style={{ width:"5%" }}/><col style={{ width:"13%" }}/><col style={{ width:"7%" }}/>
-              <col style={{ width:"20%" }}/><col style={{ width:"12%" }}/><col style={{ width:"11%" }}/><col style={{ width:"32%" }}/>
+              <col style={{ width:"5%" }}/><col style={{ width:"12%" }}/><col style={{ width:"7%" }}/>
+              <col style={{ width:"18%" }}/><col style={{ width:"11%" }}/><col style={{ width:"10%" }}/><col style={{ width:"27%" }}/><col style={{ width:"10%" }}/>
             </colgroup>
             <thead>
               <tr style={{ background:"#fafaf8" }}>
-                {["ID","用户名","类型","来源 / 场景","积分变化","变后余额","时间"].map((h,i)=>(
+                {["ID","用户名","类型","来源 / 场景","积分变化","变后余额","时间","操作"].map((h,i)=>(
                   <th key={i} style={{ padding:"10px 14px",fontSize:12,fontWeight:500,color:"#999",
-                    textAlign:i>=4&&i<=5?"right":"left",borderBottom:"0.5px solid #eee" }}>{h}</th>
+                    textAlign:i>=4&&i<=5?"right":i===7?"center":"left",borderBottom:"0.5px solid #eee" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -347,7 +475,7 @@ export default function CreditHistory() {
                     <td style={{ padding:"10px 14px" }}>
                       <span style={{ display:"inline-flex",alignItems:"center",padding:"3px 8px",borderRadius:6,fontSize:12,fontWeight:500,
                         background:isEarn?"#E1F5EE":"#FAECE7",color:isEarn?"#085041":"#4A1B0C" }}>
-                        {isEarn?"获取":"消耗"}
+                        {isEarn?"发行":"消耗"}
                       </span>
                     </td>
                     <td style={{ padding:"10px 14px",fontSize:13,color:"#555",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
@@ -358,6 +486,26 @@ export default function CreditHistory() {
                     </td>
                     <td style={{ padding:"10px 14px",fontSize:13,textAlign:"right",color:"#aaa" }}>{r.balance}</td>
                     <td style={{ padding:"10px 14px",fontSize:13,color:"#ccc" }}>{fmt(r.ts)}</td>
+                    <td style={{ padding:"10px 14px",textAlign:"center",position:"relative" }}>
+                      <button onClick={e=>{ e.stopPropagation(); setOpenMenu(openMenu===r.id?null:r.id); }}
+                        style={{ background:"none",border:"0.5px solid #e0e0e0",borderRadius:6,width:28,height:28,cursor:"pointer",fontSize:16,color:"#999",display:"inline-flex",alignItems:"center",justifyContent:"center",lineHeight:1 }}>
+                        ···
+                      </button>
+                      {openMenu===r.id && (
+                        <div onClick={e=>e.stopPropagation()}
+                          style={{ position:"absolute",right:8,top:38,zIndex:100,background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:10,boxShadow:"0 4px 16px rgba(0,0,0,.08)",minWidth:160,padding:"4px 0" }}>
+                          <div style={{ fontSize:12,fontWeight:500,color:"#bbb",padding:"6px 14px 4px" }}>操作</div>
+                          {MENU_ITEMS.map((item,mi)=>(
+                            <div key={mi}
+                              style={{ padding:"7px 14px",fontSize:13,color: item==="封禁用户"?"#993C1D":"#333",cursor:"pointer",whiteSpace:"nowrap" }}
+                              onMouseEnter={e=>e.currentTarget.style.background="#f8f8f4"}
+                              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                              {item}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
