@@ -5,6 +5,7 @@ const EARN_SOURCES = {
   email: { label: "绑定邮箱", icon: "✉" },
   refer: { label: "邀请好友", icon: "👥" },
   task:  { label: "任务系统", icon: "✅" },
+  buy:   { label: "购买套餐", icon: "💳" },
 };
 const SPEND_SOURCES = {
   vip:  { label: "兑换 VIP",  icon: "👑" },
@@ -51,13 +52,13 @@ function pickWeighted(plans, weights) {
   return plans[0];
 }
 
-const EARN_PTS = { email: 200, refer: 500 }; // fixed per source
+const EARN_PTS = { email: 200, refer: 500, buy: 300 };
 const TRANSACTIONS = Array.from({ length:200 }, (_, i) => {
   const isEarn = Math.random() > 0.35; // 65% earn
   let src, pts, plan = null;
   let taskLabel = null;
   if (isEarn) {
-    src = ["email","refer","task"][rnd(0,2)]; // weighted manually below via isEarn ratio
+    src = ["email","refer","task","buy"][rnd(0,3)];
     if (src === "task") {
       const t = TASK_LABELS[rnd(0, TASK_LABELS.length - 1)];
       taskLabel = t.label;
@@ -77,9 +78,10 @@ const TRANSACTIONS = Array.from({ length:200 }, (_, i) => {
 });
 
 const EARN_PIE = [
-  { name:"绑定邮箱", value:20, color:"#1D9E75" },
-  { name:"邀请好友", value:45, color:"#5DCAA5" },
-  { name:"任务系统", value:35, color:"#9FE1CB" },
+  { name:"绑定邮箱", value:15, color:"#1D9E75" },
+  { name:"邀请好友", value:35, color:"#5DCAA5" },
+  { name:"任务系统", value:27, color:"#9FE1CB" },
+  { name:"购买套餐", value:23, color:"#0F6E56" },
 ];
 const TASK_COLORS = ["#FAC775","#EF9F27","#5DCAA5","#1D9E75","#9FE1CB","#854F0B","#0F6E56","#BA7517"];
 
@@ -239,6 +241,7 @@ export default function CreditHistory() {
               <option value="email">绑定邮箱</option>
               <option value="refer">邀请好友</option>
               <option value="task">任务系统</option>
+              <option value="buy">购买套餐</option>
             </optgroup>
             <optgroup label="消耗">
               <option value="vip">兑换 VIP</option>
@@ -327,7 +330,7 @@ export default function CreditHistory() {
         <div style={{ display:"grid",gridTemplateColumns:"1fr 2fr",gap:12,marginBottom:16 }}>
 
           {/* Earn donut / task breakdown */}
-          <div style={{ background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:12,padding:"16px 20px",height:310,display:"flex",flexDirection:"column" }}>
+          <div style={{ background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:12,padding:"16px 20px",height:350,display:"flex",flexDirection:"column" }}>
             <div style={{ fontWeight:500,fontSize:14,marginBottom:2 }}>积分发行来源</div>
             <div style={{ fontSize:12,color:"#999",marginBottom:14 }}>
               {srcFilter==="task" ? "任务系统各类型占比" : "各渠道累计发放量"}
@@ -364,7 +367,7 @@ export default function CreditHistory() {
           </div>
 
           {/* Spend bar */}
-          <div style={{ background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:12,padding:"16px 20px",height:310,display:"flex",flexDirection:"column" }}>
+          <div style={{ background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:12,padding:"16px 20px",height:350,display:"flex",flexDirection:"column" }}>
             <div style={{ fontWeight:500,fontSize:14,marginBottom:2 }}>积分消耗细分</div>
             <div style={{ fontSize:12,color:"#999",marginBottom:12 }}>各套餐积分消耗占比</div>
             <ResponsiveContainer width="100%" style={{ flex:1 }}>
