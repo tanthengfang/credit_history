@@ -90,16 +90,23 @@ const SPEND_DURATIONS = [
 function buildSpendBar() {
   const tally = {};
   SPEND_DURATIONS.forEach(d => { tally[d.days] = { vip:0, svip:0 }; });
-  let imgCount = 0;
+  let imgPts = 0;
   TRANSACTIONS.forEach(r => {
     if (r.type!=="spend") return;
-    if ((r.src==="vip"||r.src==="svip") && r.plan && tally[r.plan.days]) tally[r.plan.days][r.src]++;
-    else if (r.src==="img") imgCount++;
+    if ((r.src==="vip"||r.src==="svip") && r.plan && tally[r.plan.days]) tally[r.plan.days][r.src] += r.pts;
+    else if (r.src==="img") imgPts += r.pts;
   });
-  return [
+  const entries = [
     ...SPEND_DURATIONS.map(d => ({ name: d.label, vip: tally[d.days].vip, svip: tally[d.days].svip })),
-    { name: "图片生成", img: imgCount },
+    { name: "图片生成", img: imgPts },
   ];
+  const total = entries.reduce((s, e) => s + (e.vip||0) + (e.svip||0) + (e.img||0), 0);
+  return entries.map(e => ({
+    ...e,
+    vipPct:  total > 0 && e.vip  ? Math.round(e.vip  / total * 100) : undefined,
+    svipPct: total > 0 && e.svip ? Math.round(e.svip / total * 100) : undefined,
+    imgPct:  total > 0 && e.img  ? Math.round(e.img  / total * 100) : undefined,
+  }));
 }
 const SPEND_BAR = buildSpendBar();
 
@@ -156,6 +163,7 @@ export default function CreditHistory() {
   const [page,       setPage]       = useState(1);
   const [openMenu,        setOpenMenu]        = useState(null);
   const [timeGranularity, setTimeGranularity] = useState("day");
+  const [trendView,       setTrendView]       = useState("chart");
 
   const MENU_ITEMS = ["用户详情","标签详情","修改用户套餐","修改邮箱","用户密码重置","注销申请","修改积分额度","推荐用户列表","打开工单","封禁用户","提升用户为代理","修改设备注册限制"];
   const timeSeriesData = useMemo(() => buildTimeSeries(timeGranularity), [timeGranularity]);
@@ -345,6 +353,7 @@ export default function CreditHistory() {
                     <span key={i} style={{ display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#666" }}>
                       <span style={{ width:10,height:10,borderRadius:2,background:d.color,flexShrink:0 }}/>
                       <span style={{ flex:1 }}>{d.name}</span>
+                      {d.name==="任务系统" && <span style={{ fontSize:11,color:"#ccc" }}>点击筛选查看明细</span>}
                       <span style={{ fontWeight:500,color:"#333" }}>{d.value}%</span>
                     </span>
                   ))}
@@ -357,19 +366,29 @@ export default function CreditHistory() {
           {/* Spend bar */}
           <div style={{ background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:12,padding:"16px 20px",height:310,display:"flex",flexDirection:"column" }}>
             <div style={{ fontWeight:500,fontSize:14,marginBottom:2 }}>积分消耗细分</div>
-            <div style={{ fontSize:12,color:"#999",marginBottom:12 }}>VIP / SVIP 按套餐时长销售量</div>
+            <div style={{ fontSize:12,color:"#999",marginBottom:12 }}>各套餐积分消耗占比</div>
             <ResponsiveContainer width="100%" style={{ flex:1 }}>
-              <BarChart data={SPEND_BAR} margin={{ top:8,right:8,left:-20,bottom:0 }} barSize={18} barGap={4}>
+              <BarChart data={SPEND_BAR} margin={{ top:20,right:8,left:-20,bottom:0 }} barSize={18} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0ec"/>
                 <XAxis dataKey="name" tick={{ fontSize:12,fill:"#bbb" }} axisLine={false} tickLine={false}/>
-                <YAxis tick={{ fontSize:11,fill:"#ccc" }} axisLine={false} tickLine={false}/>
+                <YAxis tick={{ fontSize:11,fill:"#ccc" }} axisLine={false} tickLine={false} tickFormatter={v=>`${v}`} unit=" pts"/>
                 <Tooltip cursor={{ fill:"#f8f8f4" }} contentStyle={{ fontSize:13,borderRadius:8,border:"0.5px solid #e0e0e0" }}
-                  formatter={(v,n)=>[v, n==="vip"?"VIP 销售量":n==="svip"?"SVIP 销售量":"图片生成"]}/>
-                <Legend formatter={v=>v==="vip"?"VIP 销售量":v==="svip"?"SVIP 销售量":"图片生成"}
+                  formatter={(v,n,props)=>{
+                    const pct = n==="vip"?props.payload.vipPct:n==="svip"?props.payload.svipPct:props.payload.imgPct;
+                    const label = n==="vip"?"VIP":n==="svip"?"SVIP":"图片生成";
+                    return [`${v.toLocaleString()} pts (${pct??0}%)`, label];
+                  }}/>
+                <Legend formatter={v=>v==="vip"?"VIP":v==="svip"?"SVIP":"图片生成"}
                   wrapperStyle={{ fontSize:12,paddingTop:8 }} iconType="circle" iconSize={8}/>
-                <Bar dataKey="vip"  fill="#F97316" radius={[4,4,0,0]}/>
-                <Bar dataKey="svip" fill="#8B5CF6" radius={[4,4,0,0]}/>
-                <Bar dataKey="img"  fill="#ccbfa0" radius={[4,4,0,0]}/>
+                <Bar dataKey="vip"  fill="#F97316" radius={[4,4,0,0]}>
+                  <LabelList dataKey="vipPct"  position="top" formatter={v=>v!=null?`${v}%`:""} style={{ fontSize:10,fill:"#aaa" }}/>
+                </Bar>
+                <Bar dataKey="svip" fill="#8B5CF6" radius={[4,4,0,0]}>
+                  <LabelList dataKey="svipPct" position="top" formatter={v=>v!=null?`${v}%`:""} style={{ fontSize:10,fill:"#aaa" }}/>
+                </Bar>
+                <Bar dataKey="img"  fill="#ccbfa0" radius={[4,4,0,0]}>
+                  <LabelList dataKey="imgPct"  position="top" formatter={v=>v!=null?`${v}%`:""} style={{ fontSize:10,fill:"#aaa" }}/>
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -382,38 +401,83 @@ export default function CreditHistory() {
               <div style={{ fontWeight:500,fontSize:14 }}>积分流动趋势</div>
               <div style={{ fontSize:12,color:"#999",marginTop:2 }}>发行与消耗积分随时间的变化</div>
             </div>
-            <div style={{ display:"flex",gap:2,background:"#f0ede8",padding:3,borderRadius:8 }}>
-              {[["day","按天"],["month","按月"],["quarter","按季度"]].map(([v,l])=>(
-                <button key={v} onClick={()=>setTimeGranularity(v)}
-                  style={{ height:28,padding:"0 14px",fontSize:12,border:timeGranularity===v?"0.5px solid #e0e0e0":"none",
-                    borderRadius:6,cursor:"pointer",background:timeGranularity===v?"#fff":"transparent",
-                    color:timeGranularity===v?"#111":"#888",fontWeight:timeGranularity===v?500:400 }}>{l}</button>
-              ))}
+            <div style={{ display:"flex",gap:8,alignItems:"center" }}>
+              {trendView==="chart" && (
+                <div style={{ display:"flex",gap:2,background:"#f0ede8",padding:3,borderRadius:8 }}>
+                  {[["day","按天"],["month","按月"],["quarter","按季度"]].map(([v,l])=>(
+                    <button key={v} onClick={()=>setTimeGranularity(v)}
+                      style={{ height:28,padding:"0 14px",fontSize:12,border:timeGranularity===v?"0.5px solid #e0e0e0":"none",
+                        borderRadius:6,cursor:"pointer",background:timeGranularity===v?"#fff":"transparent",
+                        color:timeGranularity===v?"#111":"#888",fontWeight:timeGranularity===v?500:400 }}>{l}</button>
+                  ))}
+                </div>
+              )}
+              <div style={{ display:"flex",gap:2,background:"#f0ede8",padding:3,borderRadius:8 }}>
+                {[["chart","趋势图"],["table","明细表"]].map(([v,l])=>(
+                  <button key={v} onClick={()=>setTrendView(v)}
+                    style={{ height:28,padding:"0 14px",fontSize:12,border:trendView===v?"0.5px solid #e0e0e0":"none",
+                      borderRadius:6,cursor:"pointer",background:trendView===v?"#fff":"transparent",
+                      color:trendView===v?"#111":"#888",fontWeight:trendView===v?500:400 }}>{l}</button>
+                ))}
+              </div>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={timeSeriesData} margin={{ top:4,right:4,left:-16,bottom:0 }}>
-              <defs>
-                <linearGradient id="gEarn" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#1D9E75" stopOpacity={0.15}/>
-                  <stop offset="95%" stopColor="#1D9E75" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="gSpend" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#993C1D" stopOpacity={0.12}/>
-                  <stop offset="95%" stopColor="#993C1D" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0ec"/>
-              <XAxis dataKey="date" tick={{ fontSize:11,fill:"#bbb" }} axisLine={false} tickLine={false}
-                interval={timeGranularity==="day" ? Math.floor(timeSeriesData.length/8) : 0}/>
-              <YAxis tick={{ fontSize:11,fill:"#ccc" }} axisLine={false} tickLine={false}/>
-              <Tooltip contentStyle={{ fontSize:13,borderRadius:8,border:"0.5px solid #e0e0e0" }}
-                formatter={(v,n)=>[v.toLocaleString(), n==="earn"?"发行积分":"消耗积分"]}/>
-              <Legend formatter={v=>v==="earn"?"发行积分":"消耗积分"} wrapperStyle={{ fontSize:12,color:"#888" }}/>
-              <Area type="monotone" dataKey="earn"  stroke="#1D9E75" strokeWidth={1.5} fill="url(#gEarn)"  dot={false}/>
-              <Area type="monotone" dataKey="spend" stroke="#993C1D" strokeWidth={1.5} fill="url(#gSpend)" dot={false}/>
-            </AreaChart>
-          </ResponsiveContainer>
+
+          {trendView==="chart" ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={timeSeriesData} margin={{ top:4,right:4,left:-16,bottom:0 }}>
+                <defs>
+                  <linearGradient id="gEarn" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#1D9E75" stopOpacity={0.15}/>
+                    <stop offset="95%" stopColor="#1D9E75" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="gSpend" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#993C1D" stopOpacity={0.12}/>
+                    <stop offset="95%" stopColor="#993C1D" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0ec"/>
+                <XAxis dataKey="date" tick={{ fontSize:11,fill:"#bbb" }} axisLine={false} tickLine={false}
+                  interval={timeGranularity==="day" ? Math.floor(timeSeriesData.length/8) : 0}/>
+                <YAxis tick={{ fontSize:11,fill:"#ccc" }} axisLine={false} tickLine={false}/>
+                <Tooltip contentStyle={{ fontSize:13,borderRadius:8,border:"0.5px solid #e0e0e0" }}
+                  formatter={(v,n)=>[v.toLocaleString(), n==="earn"?"发行积分":"消耗积分"]}/>
+                <Legend formatter={v=>v==="earn"?"发行积分":"消耗积分"} wrapperStyle={{ fontSize:12,color:"#888" }}/>
+                <Area type="monotone" dataKey="earn"  stroke="#1D9E75" strokeWidth={1.5} fill="url(#gEarn)"  dot={false}/>
+                <Area type="monotone" dataKey="spend" stroke="#993C1D" strokeWidth={1.5} fill="url(#gSpend)" dot={false}/>
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ overflowY:"auto",maxHeight:220 }} className="hide-scrollbar">
+              <table style={{ width:"100%",borderCollapse:"collapse",fontSize:13 }}>
+                <thead>
+                  <tr style={{ background:"#fafaf8",position:"sticky",top:0 }}>
+                    {["日期","发行积分","消耗积分","净增量"].map((h,i)=>(
+                      <th key={i} style={{ padding:"8px 14px",fontSize:12,fontWeight:500,color:"#999",
+                        textAlign:i===0?"left":"right",borderBottom:"0.5px solid #eee" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {buildTimeSeries("day").map((row,i,arr)=>{
+                    const net = row.earn - row.spend;
+                    return (
+                      <tr key={i} style={{ borderBottom:i<arr.length-1?"0.5px solid #f0f0ec":"none" }}
+                        onMouseEnter={e=>e.currentTarget.style.background="#fafaf8"}
+                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        <td style={{ padding:"8px 14px",color:"#555" }}>{row.date}</td>
+                        <td style={{ padding:"8px 14px",textAlign:"right",color:"#0F6E56",fontWeight:500 }}>+{row.earn.toLocaleString()}</td>
+                        <td style={{ padding:"8px 14px",textAlign:"right",color:"#993C1D",fontWeight:500 }}>-{row.spend.toLocaleString()}</td>
+                        <td style={{ padding:"8px 14px",textAlign:"right",fontWeight:500,color:net>=0?"#0F6E56":"#993C1D" }}>
+                          {net>=0?"+":""}{net.toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Table */}
