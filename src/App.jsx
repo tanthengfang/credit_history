@@ -319,55 +319,6 @@ export default function CreditHistory() {
           <div style={{ flex:1 }}/>
         </div>
 
-        {/* Metrics */}
-        {(() => {
-          const allEarned = dateTxns.filter(r=>r.type==="earn").reduce((s,r)=>s+r.pts,0);
-          const allSpent  = dateTxns.filter(r=>r.type==="spend").reduce((s,r)=>s+r.pts,0);
-          const netChange = allEarned - allSpent;
-          const rawRatio  = allEarned > 0 ? allSpent / allEarned : 0;
-          const ratio     = Math.min(0.95, Math.max(0.70, rawRatio)).toFixed(2);
-          const totalStock = 8650000;
-          const PLATFORM_ACTIVE_USERS = 38241;
-          const spendUsers = new Set(dateTxns.filter(r=>r.type==="spend").map(r=>r.user)).size;
-          const scaledSpendUsers = Math.round(spendUsers / 20 * PLATFORM_ACTIVE_USERS * 0.62);
-          const penetration = Math.min(Math.round(scaledSpendUsers / PLATFORM_ACTIVE_USERS * 100), 85);
-          const fmtK = n => n >= 1000000 ? `${(n/1000000).toFixed(2)}M` : n >= 1000 ? `${(n/1000).toFixed(0)}K` : n;
-          const cards = [
-            {
-              label: "净增量",
-              value: `${netChange>=0?"+":""}${fmtK(netChange)}`,
-              sub: `发行 ${fmtK(allEarned)} － 消耗 ${fmtK(allSpent)}`,
-              valueColor: netChange >= 0 ? "#0F6E56" : "#993C1D",
-            },
-            {
-              label: "消耗 / 发行比",
-              value: ratio,
-              ratioHealthy: parseFloat(ratio) >= 0.7 && parseFloat(ratio) <= 0.95,
-              sub: parseFloat(ratio) < 1 ? "↓ 发多于花，余额累积" : "↑ 消耗超过发行",
-              valueColor: parseFloat(ratio) >= 0.7 && parseFloat(ratio) <= 0.95 ? "#0F6E56" : "#993C1D",
-            },
-          ];
-          return (
-            <div style={{ display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:16 }}>
-              {cards.map((m,i)=>(
-                <div key={i} style={{ background:"#fff",borderRadius:10,border:"0.5px solid #e8e8e0",padding:"14px 16px" }}>
-                  <div style={{ fontSize:12,color:"#999",marginBottom:8 }}>{m.label}</div>
-                  <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-                    <span style={{ fontSize:22,fontWeight:700,color:m.valueColor,letterSpacing:"-0.5px" }}>{m.value}</span>
-                    {"ratioHealthy" in m && (
-                      <span style={{ fontSize:11,padding:"2px 7px",borderRadius:4,
-                        background: m.ratioHealthy ? "#E1F5EE" : "#FAECE7",
-                        color: m.ratioHealthy ? "#0F6E56" : "#993C1D" }}>
-                        健康区间 0.7 ~ 0.95
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize:12,color:"#aaa",marginTop:4 }}>{m.sub}</div>
-                </div>
-              ))}
-            </div>
-          );
-        })()}
 
         {/* Charts */}
         <div style={{ display:"grid",gridTemplateColumns:"1fr 2fr",gap:12,marginBottom:16 }}>
@@ -656,28 +607,22 @@ export default function CreditHistory() {
                 <table style={{ width:"100%",borderCollapse:"collapse",fontSize:13 }}>
                   <thead>
                     <tr style={{ background:"#fafaf8" }}>
-                      {["日期","发行积分","消耗积分","净增量"].map((h,i)=>(
+                      {["日期","发行积分","消耗积分"].map((h,i)=>(
                         <th key={i} style={{ padding:"8px 14px",fontSize:12,fontWeight:500,color:"#999",
                           textAlign:i===0?"left":"right",borderBottom:"0.5px solid #eee" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {tblSlice.map((row,i)=>{
-                      const net = row.earn - row.spend;
-                      return (
-                        <tr key={i} style={{ borderBottom:i<tblSlice.length-1?"0.5px solid #f0f0ec":"none" }}
-                          onMouseEnter={e=>e.currentTarget.style.background="#fafaf8"}
-                          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                          <td style={{ padding:"8px 14px",color:"#555" }}>{row.date}</td>
-                          <td style={{ padding:"8px 14px",textAlign:"right",color:"#0F6E56",fontWeight:500 }}>+{row.earn.toLocaleString()}</td>
-                          <td style={{ padding:"8px 14px",textAlign:"right",color:"#993C1D",fontWeight:500 }}>-{row.spend.toLocaleString()}</td>
-                          <td style={{ padding:"8px 14px",textAlign:"right",fontWeight:500,color:net>=0?"#0F6E56":"#993C1D" }}>
-                            {net>=0?"+":""}{net.toLocaleString()}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {tblSlice.map((row,i)=>(
+                      <tr key={i} style={{ borderBottom:i<tblSlice.length-1?"0.5px solid #f0f0ec":"none" }}
+                        onMouseEnter={e=>e.currentTarget.style.background="#fafaf8"}
+                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        <td style={{ padding:"8px 14px",color:"#555" }}>{row.date}</td>
+                        <td style={{ padding:"8px 14px",textAlign:"right",color:"#0F6E56",fontWeight:500 }}>+{row.earn.toLocaleString()}</td>
+                        <td style={{ padding:"8px 14px",textAlign:"right",color:"#993C1D",fontWeight:500 }}>-{row.spend.toLocaleString()}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
                 <div style={{ padding:"10px 14px",borderTop:"0.5px solid #eee",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
