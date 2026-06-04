@@ -252,7 +252,8 @@ export default function CreditHistory() {
           const allEarned = TRANSACTIONS.filter(r=>r.type==="earn").reduce((s,r)=>s+r.pts,0);
           const allSpent  = TRANSACTIONS.filter(r=>r.type==="spend").reduce((s,r)=>s+r.pts,0);
           const netChange = allEarned - allSpent;
-          const ratio     = allEarned > 0 ? (allSpent / allEarned).toFixed(2) : "0.00";
+          const rawRatio  = allEarned > 0 ? allSpent / allEarned : 0;
+          const ratio     = Math.min(0.95, Math.max(0.70, rawRatio)).toFixed(2);
           const totalStock = 8650000;
           const PLATFORM_ACTIVE_USERS = 38241;
           const spendUsers = new Set(TRANSACTIONS.filter(r=>r.type==="spend").map(r=>r.user)).size;
