@@ -117,9 +117,10 @@ function buildTimeSeries(granularity, txns = TRANSACTIONS) {
   txns.forEach(r => {
     const d = r.ts;
     let key;
-    if (granularity === "day")   key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    if (granularity === "hour")  key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:00`;
+    else if (granularity === "day")   key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
     else if (granularity === "month") key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-    else key = `${d.getFullYear()}-Q${Math.floor(d.getMonth()/3)+1}`;
+    else key = `${d.getFullYear()}`;
     if (!buckets[key]) buckets[key] = { date: key, earn: 0, spend: 0 };
     if (r.type === "earn") buckets[key].earn += r.pts;
     else buckets[key].spend += r.pts;
@@ -191,6 +192,8 @@ export default function CreditHistory() {
   const [currentPage,     setCurrentPage]     = useState("records");
   const [startDate, setStartDate] = useState("2026-02-10");
   const [endDate,   setEndDate]   = useState("2026-05-11");
+  const [aStartDate, setAStartDate] = useState("2026-02-10T00:00");
+  const [aEndDate,   setAEndDate]   = useState("2026-05-11T23:59");
 
   const MENU_ITEMS = ["用户详情","标签详情","修改用户套餐","修改邮箱","用户密码重置","注销申请","修改积分额度","推荐用户列表","打开工单","封禁用户","提升用户为代理","修改设备注册限制"];
 
@@ -199,6 +202,12 @@ export default function CreditHistory() {
     const to   = new Date(endDate   + "T23:59:59");
     return TRANSACTIONS.filter(r => r.ts >= from && r.ts <= to);
   }, [startDate, endDate]);
+
+  const analyticsTxns = useMemo(() => {
+    const from = new Date(aStartDate);
+    const to   = new Date(aEndDate);
+    return TRANSACTIONS.filter(r => r.ts >= from && r.ts <= to);
+  }, [aStartDate, aEndDate]);
 
   const planOptions = useMemo(() => {
     if (srcFilter==="vip")  return VIP_PLANS.map(p=>({ v:String(p.days), l:`${p.days}天` }));
@@ -228,22 +237,42 @@ export default function CreditHistory() {
   const isFiltered = srcFilter!=="all" || planFilter!=="all" || tab!=="all" || search!=="";
 
   const earnPieData = useMemo(() => {
-    if (srcFilter !== "task") return EARN_PIE;
+    if (srcFilter !== "task") {
+      const srcKeys = ["email","refer","task","buy"];
+      const srcColors = ["#1D9E75","#5DCAA5","#9FE1CB","#0F6E56"];
+      const ptsBySource = {};
+      dateTxns.filter(r=>r.type==="earn").forEach(r => {
+        ptsBySource[r.src] = (ptsBySource[r.src] || 0) + r.pts;
+      });
+      const totalPts = Object.values(ptsBySource).reduce((s,v)=>s+v, 0);
+      if (totalPts === 0) return EARN_PIE.map(d=>({...d, pts:0}));
+      const raw = srcKeys.map((k,i) => ({
+        name: EARN_SOURCES[k]?.label || k,
+        pts: ptsBySource[k] || 0,
+        raw: ((ptsBySource[k] || 0) / totalPts) * 100,
+        color: srcColors[i],
+      })).filter(e => e.pts > 0);
+      const floors = raw.map(e => Math.floor(e.raw));
+      const diff = 100 - floors.reduce((a,b)=>a+b,0);
+      raw.map((e,i)=>({i, frac: e.raw - Math.floor(e.raw)}))
+         .sort((a,b)=>b.frac-a.frac).slice(0,diff)
+         .forEach(({i})=>floors[i]++);
+      return raw.map((e,i)=>({...e, value: floors[i]}));
+    }
     const taskTxns = dateTxns.filter(r => r.src === "task" && r.taskLabel);
-    const total = taskTxns.length;
-    if (total === 0) return EARN_PIE;
-    const counts = {};
-    taskTxns.forEach(r => { counts[r.taskLabel] = (counts[r.taskLabel] || 0) + 1; });
-    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    const raw = sorted.map(([name, count]) => ({ name, raw: count / total * 100 }));
+    const totalPts = taskTxns.reduce((s,r)=>s+r.pts, 0);
+    if (totalPts === 0) return EARN_PIE.map(d=>({...d, pts:0}));
+    const ptsByLabel = {};
+    taskTxns.forEach(r => { ptsByLabel[r.taskLabel] = (ptsByLabel[r.taskLabel] || 0) + r.pts; });
+    const sorted = Object.entries(ptsByLabel).sort((a, b) => b[1] - a[1]);
+    const raw = sorted.map(([name, pts]) => ({ name, pts, raw: pts / totalPts * 100 }));
     const floors = raw.map(e => Math.floor(e.raw));
     const diff = 100 - floors.reduce((a, b) => a + b, 0);
     raw.map((e, i) => ({ i, frac: e.raw - Math.floor(e.raw) }))
-       .sort((a, b) => b.frac - a.frac)
-       .slice(0, diff)
+       .sort((a, b) => b.frac - a.frac).slice(0, diff)
        .forEach(({ i }) => floors[i]++);
-    return raw.map((e, i) => ({ name: e.name, value: floors[i], color: TASK_COLORS[i % TASK_COLORS.length] }));
-  }, [srcFilter]);
+    return raw.map((e, i) => ({ ...e, value: floors[i], color: TASK_COLORS[i % TASK_COLORS.length] }));
+  }, [srcFilter, dateTxns]);
 
   const timeSeriesData = useMemo(() => buildTimeSeries(timeGranularity, dateTxns), [timeGranularity, dateTxns]);
   const spendBarData   = useMemo(() => buildSpendBarFrom(dateTxns), [dateTxns]);
@@ -353,9 +382,12 @@ export default function CreditHistory() {
               <div className="hide-scrollbar" style={{ display:"flex",flexDirection:"column",gap:10,overflowY:"auto",flex:1 }}>
                 {earnPieData.map((d,i)=>(
                   <div key={i}>
-                    <div style={{ display:"flex",justifyContent:"space-between",fontSize:12,color:"#555",marginBottom:4 }}>
+                    <div style={{ display:"flex",justifyContent:"space-between",alignItems:"baseline",fontSize:12,color:"#555",marginBottom:4 }}>
                       <span>{d.name}</span>
-                      <span style={{ fontWeight:500,color:"#333" }}>{d.value}%</span>
+                      <span style={{ display:"flex",gap:8,alignItems:"baseline" }}>
+                        <span style={{ fontSize:11,color:"#aaa" }}>{d.pts!=null ? d.pts.toLocaleString()+" pts" : ""}</span>
+                        <span style={{ fontWeight:500,color:"#333",minWidth:32,textAlign:"right" }}>{d.value}%</span>
+                      </span>
                     </div>
                     <div style={{ height:6,borderRadius:3,background:"#f0f0ec" }}>
                       <div style={{ height:"100%",borderRadius:3,background:d.color,width:`${d.value}%`,transition:"width 0.3s" }}/>
@@ -371,7 +403,8 @@ export default function CreditHistory() {
                       <span style={{ width:10,height:10,borderRadius:2,background:d.color,flexShrink:0 }}/>
                       <span style={{ flex:1 }}>{d.name}</span>
                       {d.name==="任务系统" && <span onClick={()=>changeSrc("task")} style={{ fontSize:11,color:"#bbb",cursor:"pointer",textDecoration:"underline",textDecorationStyle:"dotted" }}>点击筛选查看明细</span>}
-                      <span style={{ fontWeight:500,color:"#333" }}>{d.value}%</span>
+                      <span style={{ color:"#aaa",fontSize:11 }}>{d.pts!=null ? d.pts.toLocaleString()+" pts" : ""}</span>
+                      <span style={{ fontWeight:500,color:"#333",minWidth:32,textAlign:"right" }}>{d.value}%</span>
                     </span>
                   ))}
                 </div>
@@ -548,11 +581,8 @@ export default function CreditHistory() {
         </> }
 
         {currentPage==="analytics" && (() => {
-          const PLATFORM_ACTIVE_USERS = 38241;
-          const spendUsers = new Set(TRANSACTIONS.filter(r=>r.type==="spend").map(r=>r.user)).size;
-          const scaledSpendUsers = Math.round(spendUsers / 20 * PLATFORM_ACTIVE_USERS * 0.62);
-          const penetration = Math.min(Math.round(scaledSpendUsers / PLATFORM_ACTIVE_USERS * 100), 85);
-          const dailyRows = buildTimeSeries("day");
+          const dailyRows = buildTimeSeries("day", analyticsTxns);
+          const analyticsSeriesData = buildTimeSeries(timeGranularity, analyticsTxns);
           const tblTotalPages = Math.max(1, Math.ceil(dailyRows.length / 10));
           const tblSafePage  = Math.min(trendView === "chart" ? 1 : parseInt(trendView) || 1, tblTotalPages);
           const tblSlice     = dailyRows.slice((tblSafePage - 1) * 10, tblSafePage * 10);
@@ -560,23 +590,28 @@ export default function CreditHistory() {
           const goTblPage    = p => setTrendView(String(Math.max(1, Math.min(p, tblTotalPages))));
           return (
             <>
+              {/* Analytics date picker */}
+              <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:16 }}>
+                <div style={{ display:"flex",alignItems:"center",gap:6,background:"#fff",border:"0.5px solid #ddd",borderRadius:8,padding:"0 12px",height:34 }}>
+                  <span style={{ fontSize:13,color:"#aaa" }}>📅</span>
+                  <input type="datetime-local" value={aStartDate} max={aEndDate}
+                    onChange={e=>setAStartDate(e.target.value)}
+                    style={{ border:"none",outline:"none",fontSize:13,color:"#333",background:"transparent",cursor:"pointer",fontFamily:"'Inter','Noto Sans SC',system-ui,sans-serif" }}/>
+                  <span style={{ fontSize:12,color:"#ccc" }}>—</span>
+                  <input type="datetime-local" value={aEndDate} min={aStartDate}
+                    onChange={e=>setAEndDate(e.target.value)}
+                    style={{ border:"none",outline:"none",fontSize:13,color:"#333",background:"transparent",cursor:"pointer",fontFamily:"'Inter','Noto Sans SC',system-ui,sans-serif" }}/>
+                </div>
+              </div>
               <div style={{ background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:12,padding:"16px 20px",marginBottom:16 }}>
                 {/* Chart header */}
                 <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
-                  <div style={{ display:"flex",alignItems:"baseline",gap:20 }}>
-                    <div>
-                      <div style={{ fontWeight:500,fontSize:14 }}>积分流动趋势</div>
-                      <div style={{ fontSize:12,color:"#999",marginTop:2 }}>发行与消耗积分随时间的变化</div>
-                    </div>
-                    <div style={{ borderLeft:"0.5px solid #eee",paddingLeft:20 }}>
-                      <div style={{ fontSize:11,color:"#999",marginBottom:2 }}>消耗渗透率</div>
-                      <div style={{ fontSize:20,fontWeight:700,color:"#6D28D9",letterSpacing:"-0.5px" }}>{penetration}%
-                        <span style={{ fontSize:11,fontWeight:400,color:"#bbb",marginLeft:6 }}>有余额且花过积分</span>
-                      </div>
-                    </div>
+                  <div>
+                    <div style={{ fontWeight:500,fontSize:14 }}>积分流动趋势</div>
+                    <div style={{ fontSize:12,color:"#999",marginTop:2 }}>发行与消耗积分随时间的变化</div>
                   </div>
                   <div style={{ display:"flex",gap:2,background:"#f0ede8",padding:3,borderRadius:8 }}>
-                    {[["day","按天"],["month","按月"],["quarter","按季度"]].map(([v,l])=>(
+                    {[["hour","按小时"],["day","按天"],["month","按月"],["year","按年"]].map(([v,l])=>(
                       <button key={v} onClick={()=>setTimeGranularity(v)}
                         style={{ height:28,padding:"0 14px",fontSize:12,border:timeGranularity===v?"0.5px solid #e0e0e0":"none",
                           borderRadius:6,cursor:"pointer",background:timeGranularity===v?"#fff":"transparent",
@@ -587,7 +622,7 @@ export default function CreditHistory() {
 
                 {/* Trend chart */}
                 <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={timeSeriesData} margin={{ top:4,right:4,left:-16,bottom:0 }}>
+                  <AreaChart data={analyticsSeriesData} margin={{ top:4,right:4,left:-16,bottom:0 }}>
                     <defs>
                       <linearGradient id="gEarn" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%"  stopColor="#1D9E75" stopOpacity={0.15}/>
@@ -600,7 +635,7 @@ export default function CreditHistory() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0ec"/>
                     <XAxis dataKey="date" tick={{ fontSize:11,fill:"#bbb" }} axisLine={false} tickLine={false}
-                      interval={timeGranularity==="day" ? Math.floor(timeSeriesData.length/8) : 0}/>
+                      interval={["hour","day"].includes(timeGranularity) ? Math.max(0, Math.floor(analyticsSeriesData.length/8)) : 0}/>
                     <YAxis tick={{ fontSize:11,fill:"#ccc" }} axisLine={false} tickLine={false}/>
                     <Tooltip contentStyle={{ fontSize:13,borderRadius:8,border:"0.5px solid #e0e0e0" }}
                       formatter={(v,n)=>[v.toLocaleString(), n==="earn"?"发行积分":"消耗积分"]}/>
