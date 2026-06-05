@@ -2,15 +2,17 @@ import { useState, useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList, AreaChart, Area, Legend } from "recharts";
 
 const EARN_SOURCES = {
-  email: { label: "绑定邮箱", icon: "✉" },
-  refer: { label: "邀请好友", icon: "👥" },
-  task:  { label: "任务系统", icon: "✅" },
-  buy:   { label: "购买套餐", icon: "💳" },
+  email:     { label: "绑定邮箱",    icon: "✉" },
+  refer:     { label: "邀请好友",    icon: "👥" },
+  task:      { label: "任务系统",    icon: "✅" },
+  buy:       { label: "购买套餐",    icon: "💳" },
+  admin_add: { label: "后台添加积分", icon: "🔧" },
 };
 const SPEND_SOURCES = {
-  vip:  { label: "兑换 VIP",  icon: "👑" },
-  svip: { label: "兑换 SVIP", icon: "⭐" },
-  img:  { label: "图片生成",  icon: "🖼" },
+  vip:          { label: "兑换 VIP",    icon: "👑" },
+  svip:         { label: "兑换 SVIP",   icon: "⭐" },
+  img:          { label: "图片生成",    icon: "🖼" },
+  admin_deduct: { label: "后台扣减积分", icon: "🔧" },
 };
 const ALL_SOURCES = { ...EARN_SOURCES, ...SPEND_SOURCES };
 
@@ -44,6 +46,11 @@ const TASK_LABELS = [
   { label:"完成每日签到任务",            pts: 20  },
   { label:"完成分享至朋友圈任务",         pts: 50  },
 ];
+const REFER_TYPES = [
+  { label:"邀请奖励 - 使用邀请码", pts: 200 },
+  { label:"被邀请人消费返利",       pts: 100 },
+  { label:"邀请奖励 - 邀请好友",   pts: 500 },
+];
 
 function pickWeighted(plans, weights) {
   const total = weights.reduce((a,b) => a+b, 0);
@@ -54,27 +61,33 @@ function pickWeighted(plans, weights) {
 
 const EARN_PTS = { email: 200, refer: 500, buy: 300 };
 const TRANSACTIONS = Array.from({ length:200 }, (_, i) => {
-  const isEarn = Math.random() > 0.35; // 65% earn
-  let src, pts, plan = null;
-  let taskLabel = null;
+  const isEarn = Math.random() > 0.35;
+  let src, pts, plan = null, taskLabel = null, referType = null;
   if (isEarn) {
-    src = ["email","refer","task","buy"][rnd(0,3)];
+    src = pickWeighted(["email","refer","task","buy","admin_add"], [10,20,25,20,5]);
     if (src === "task") {
       const t = TASK_LABELS[rnd(0, TASK_LABELS.length - 1)];
       taskLabel = t.label;
       pts = t.pts;
+    } else if (src === "refer") {
+      const rt = REFER_TYPES[rnd(0, REFER_TYPES.length - 1)];
+      referType = rt.label;
+      pts = rt.pts;
+    } else if (src === "admin_add") {
+      pts = rnd(1, 20) * 100;
     } else {
       pts = EARN_PTS[src];
     }
   } else {
-    src = ["vip","svip","img"][rnd(0,2)];
-    if (src==="vip")       { plan = pickWeighted(VIP_PLANS,  [35,25,20,10,5,3,2]); pts = plan.pts; }
-    else if (src==="svip") { plan = pickWeighted(SVIP_PLANS, [30,22,20,12,8,5,3]); pts = plan.pts; }
-    else pts = [5, 10, 20][rnd(0,2)];
+    src = pickWeighted(["vip","svip","img","admin_deduct"], [35,30,20,5]);
+    if (src==="vip")            { plan = pickWeighted(VIP_PLANS,  [35,25,20,10,5,3,2]); pts = plan.pts; }
+    else if (src==="svip")      { plan = pickWeighted(SVIP_PLANS, [30,22,20,12,8,5,3]); pts = plan.pts; }
+    else if (src==="img")       { pts = [5, 10, 20][rnd(0,2)]; }
+    else                        { pts = rnd(1, 30) * 50; }
   }
   const base = new Date("2026-05-11T10:45:00");
   const ts   = new Date(base.getTime() - i * rnd(8,16) * 3600000);
-  return { id:i+1, user:NAMES[rnd(0,NAMES.length-1)], src, pts, plan, taskLabel, type:isEarn?"earn":"spend", ts, balance:rnd(1200,9800) };
+  return { id:i+1, user:NAMES[rnd(0,NAMES.length-1)], src, pts, plan, taskLabel, referType, type:isEarn?"earn":"spend", ts, balance:rnd(1200,9800) };
 });
 
 const EARN_PIE = [
@@ -117,7 +130,7 @@ function buildTimeSeries(granularity, txns = TRANSACTIONS) {
   txns.forEach(r => {
     const d = r.ts;
     let key;
-    if (granularity === "hour")  key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:00`;
+    if (granularity === "hour") { const h2 = Math.floor(d.getHours()/2)*2; const h2e = h2+2; key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")} ${String(h2).padStart(2,"0")}:00~${String(h2e).padStart(2,"0")}:00`; }
     else if (granularity === "day")   key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
     else if (granularity === "month") key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
     else key = `${d.getFullYear()}`;
@@ -210,9 +223,10 @@ export default function CreditHistory() {
   }, [aStartDate, aEndDate]);
 
   const planOptions = useMemo(() => {
-    if (srcFilter==="vip")  return VIP_PLANS.map(p=>({ v:String(p.days), l:`${p.days}天` }));
-    if (srcFilter==="svip") return SVIP_PLANS.map(p=>({ v:String(p.days), l:`${p.days}天` }));
-    if (srcFilter==="task") return TASK_LABELS.map(t=>({ v:t.label, l:t.label }));
+    if (srcFilter==="vip")   return VIP_PLANS.map(p=>({ v:String(p.days), l:`${p.days}天` }));
+    if (srcFilter==="svip")  return SVIP_PLANS.map(p=>({ v:String(p.days), l:`${p.days}天` }));
+    if (srcFilter==="task")  return TASK_LABELS.map(t=>({ v:t.label, l:t.label }));
+    if (srcFilter==="refer") return REFER_TYPES.map(t=>({ v:t.label, l:t.label }));
     return [];
   }, [srcFilter]);
 
@@ -221,7 +235,9 @@ export default function CreditHistory() {
     if (tab==="spend" && r.type!=="spend") return false;
     if (srcFilter!=="all" && r.src!==srcFilter) return false;
     if (planFilter!=="all") {
-      if (srcFilter==="task" ? r.taskLabel!==planFilter : (!r.plan || String(r.plan.days)!==planFilter)) return false;
+      if (srcFilter==="task"  && r.taskLabel!==planFilter) return false;
+      if (srcFilter==="refer" && r.referType!==planFilter) return false;
+      if (srcFilter!=="task" && srcFilter!=="refer" && (!r.plan || String(r.plan.days)!==planFilter)) return false;
     }
     if (search && !r.user.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
@@ -241,7 +257,7 @@ export default function CreditHistory() {
       const srcKeys = ["email","refer","task","buy"];
       const srcColors = ["#1D9E75","#5DCAA5","#9FE1CB","#0F6E56"];
       const ptsBySource = {};
-      dateTxns.filter(r=>r.type==="earn").forEach(r => {
+      dateTxns.filter(r=>r.type==="earn" && r.src!=="admin_add").forEach(r => {
         ptsBySource[r.src] = (ptsBySource[r.src] || 0) + r.pts;
       });
       const totalPts = Object.values(ptsBySource).reduce((s,v)=>s+v, 0);
@@ -414,16 +430,18 @@ export default function CreditHistory() {
                 <option value="refer">邀请好友</option>
                 <option value="task">任务系统</option>
                 <option value="buy">购买套餐</option>
+                <option value="admin_add">后台添加积分</option>
               </optgroup>
               <optgroup label="消耗">
                 <option value="vip">兑换 VIP</option>
                 <option value="svip">兑换 SVIP</option>
                 <option value="img">图片生成</option>
+                <option value="admin_deduct">后台扣减积分</option>
               </optgroup>
             </select>
             {planOptions.length > 0 && (
               <select value={planFilter} onChange={e=>changePlan(e.target.value)} style={sel}>
-                <option value="all">{srcFilter==="task" ? "全部任务种类" : "全部时长"}</option>
+                <option value="all">{srcFilter==="task" ? "全部任务种类" : srcFilter==="refer" ? "全部邀请类型" : "全部时长"}</option>
                 {planOptions.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
               </select>
             )}
@@ -479,7 +497,7 @@ export default function CreditHistory() {
                       </span>
                     </td>
                     <td style={{ padding:"10px 14px",fontSize:13,color:"#555",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
-                      {r.plan ? `兑换${r.plan.days}天${r.src.toUpperCase()}` : r.taskLabel ?? m.label}
+                      {r.plan ? `兑换${r.plan.days}天${r.src.toUpperCase()}` : r.referType ?? r.taskLabel ?? m.label}
                     </td>
                     <td style={{ padding:"10px 14px",fontSize:13,fontWeight:500,textAlign:"right",color:isEarn?"#0F6E56":"#993C1D" }}>
                       {isEarn?"+":"-"}{r.pts}
@@ -532,7 +550,7 @@ export default function CreditHistory() {
         </> }
 
         {currentPage==="analytics" && (() => {
-          const dailyRows = buildTimeSeries("day", analyticsTxns);
+          const dailyRows = buildTimeSeries(timeGranularity, analyticsTxns);
           const analyticsSeriesData = buildTimeSeries(timeGranularity, analyticsTxns);
           const tblTotalPages = Math.max(1, Math.ceil(dailyRows.length / 10));
           const tblSafePage  = Math.min(trendView === "chart" ? 1 : parseInt(trendView) || 1, tblTotalPages);
@@ -563,7 +581,7 @@ export default function CreditHistory() {
                   </div>
                   <div style={{ display:"flex",gap:2,background:"#f0ede8",padding:3,borderRadius:8 }}>
                     {[["hour","按小时"],["day","按天"],["month","按月"],["year","按年"]].map(([v,l])=>(
-                      <button key={v} onClick={()=>setTimeGranularity(v)}
+                      <button key={v} onClick={()=>{ setTimeGranularity(v); setTrendView("1"); }}
                         style={{ height:28,padding:"0 14px",fontSize:12,border:timeGranularity===v?"0.5px solid #e0e0e0":"none",
                           borderRadius:6,cursor:"pointer",background:timeGranularity===v?"#fff":"transparent",
                           color:timeGranularity===v?"#111":"#888",fontWeight:timeGranularity===v?500:400 }}>{l}</button>
@@ -601,8 +619,8 @@ export default function CreditHistory() {
 
                 {/* Daily table header */}
                 <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8 }}>
-                  <div style={{ fontWeight:500,fontSize:13 }}>每日明细</div>
-                  <span style={{ fontSize:12,color:"#aaa" }}>共 {dailyRows.length} 天</span>
+                  <div style={{ fontWeight:500,fontSize:13 }}>{{ hour:"每小时明细", day:"每日明细", month:"每月明细", year:"每年明细" }[timeGranularity]}</div>
+                  <span style={{ fontSize:12,color:"#aaa" }}>共 {dailyRows.length} 条</span>
                 </div>
                 <table style={{ width:"100%",borderCollapse:"collapse",fontSize:13 }}>
                   <thead>
