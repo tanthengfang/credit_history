@@ -410,11 +410,23 @@ export default function CreditHistory() {
 
           {/* Earn donut / task breakdown */}
           <div style={{ background:"#fff",border:"0.5px solid #e8e8e0",borderRadius:12,padding:"16px 20px",height:350,display:"flex",flexDirection:"column" }}>
-            <div style={{ fontWeight:500,fontSize:14,marginBottom:2 }}>{T.chart_earn_title}</div>
-            <div style={{ fontSize:12,color:"#999",marginBottom:14 }}>
-              {srcFilter==="task" ? T.chart_earn_sub_task : T.chart_earn_sub_all}
+            <div style={{ display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:14 }}>
+              <div>
+                <div style={{ fontWeight:500,fontSize:14,marginBottom:2 }}>{T.chart_earn_title}</div>
+                <div style={{ fontSize:12,color:"#999" }}>
+                  {srcFilter==="task" ? T.chart_earn_sub_task : T.chart_earn_sub_all}
+                </div>
+              </div>
+              {srcFilter==="task" && (
+                <button onClick={()=>changeSrc("all")}
+                  style={{ height:26,padding:"0 10px",fontSize:12,borderRadius:6,flexShrink:0,
+                    border:"0.5px solid #ddd",background:"#fff",color:"#666",cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4 }}>
+                  ← {lang==="en" ? "Back" : "返回"}
+                </button>
+              )}
             </div>
             {srcFilter==="task" ? (
+              <div style={{ display:"flex",flexDirection:"column",flex:1,minHeight:0 }}>
               <div className="hide-scrollbar" style={{ display:"flex",flexDirection:"column",gap:10,overflowY:"auto",flex:1 }}>
                 {earnPieData.map((d,i)=>(
                   <div key={i}>
@@ -430,6 +442,7 @@ export default function CreditHistory() {
                     </div>
                   </div>
                 ))}
+              </div>
               </div>
             ) : (
               <>
