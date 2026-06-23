@@ -190,7 +190,6 @@ const LANGS = {
   },
   en: {
     title: "Credit History",
-    subtitle: "Track credit issuance and consumption, analyse source and usage distribution",
     nav_records: "Credit Records", nav_analytics: "Credit Analytics",
     tab_all: "All", tab_earn: "Issued", tab_spend: "Spent",
     src_all: "All Sources",
@@ -375,7 +374,6 @@ export default function CreditHistory() {
           {T.lang_toggle}
         </button>
         <h1 style={{ fontSize:28,fontWeight:600,margin:0,color:"#111" }}>{T.title}</h1>
-        <p style={{ fontSize:13,color:"#888",marginTop:6 }}>{T.subtitle}</p>
         <div style={{ display:"inline-flex",gap:2,background:"#ece9e4",padding:3,borderRadius:10,marginTop:16 }}>
           {[["records", T.nav_records],["analytics", T.nav_analytics]].map(([v,l])=>(
             <button key={v} onClick={()=>setCurrentPage(v)}
@@ -528,10 +526,9 @@ export default function CreditHistory() {
               </select>
             )}
             <div style={{ position:"relative",display:"flex",alignItems:"center" }}>
-              <span style={{ position:"absolute",left:9,fontSize:14,color:"#aaa" }}>🔍</span>
               <input value={search} onChange={e=>doSearch(e.target.value)}
                 placeholder={T.search_ph}
-                style={{ paddingLeft:28,height:32,width:180,fontSize:13,borderRadius:8,border:"0.5px solid #ddd",outline:"none",color:"#333",backgroundColor:"#fff" }}/>
+                style={{ paddingLeft:12,height:32,width:180,fontSize:13,borderRadius:8,border:"0.5px solid #ddd",outline:"none",color:"#333",backgroundColor:"#fff" }}/>
             </div>
             <div style={{ flex:1 }}/>
             <span style={{ fontSize:12,color:"#aaa" }}>{T.records_n(filtered.length)}</span>
